@@ -9,7 +9,11 @@ int main() {
 
     int client_socket;
 
-    char buffer[1024];
+    char buffer[1024],
+         filename[100],
+         newfile[100];
+
+    FILE *fp;
 
     struct sockaddr_in server_addr;
 
@@ -25,7 +29,7 @@ int main() {
         return 1;
     }
 
-    // Configure server address
+    // Configure server
     server_addr.sin_family = AF_INET;
 
     server_addr.sin_port = htons(2121);
@@ -33,84 +37,64 @@ int main() {
     server_addr.sin_addr.s_addr =
             inet_addr("127.0.0.1");
 
-    // Connect to FTP server
+    // Connect
     connect(client_socket,
            (struct sockaddr*)&server_addr,
            sizeof(server_addr));
 
-    // Receive welcome message
-    recv(client_socket,
-         buffer,
-         sizeof(buffer),
-         0);
+    printf("Connected to Server\n");
 
-    printf("%s\n", buffer);
+    // Input filename
+    printf("Enter existing file name : ");
 
-    // USER command
-    strcpy(buffer,
-           "USER admin\r\n");
+    scanf("%s", filename);
 
+    printf("Enter new file name : ");
+
+    scanf("%s", newfile);
+
+    // Create new file
+    fp = fopen(newfile, "w");
+
+    // Send filename
     send(client_socket,
-         buffer,
-         strlen(buffer),
+         filename,
+         strlen(filename),
          0);
 
-    recv(client_socket,
-         buffer,
-         sizeof(buffer),
-         0);
+    while(1){
 
-    printf("%s\n", buffer);
+        memset(buffer, 0, sizeof(buffer));
 
-    // PASS command
-    strcpy(buffer,
-           "PASS 1234\r\n");
+        recv(client_socket,
+             buffer,
+             sizeof(buffer),
+             0);
 
-    send(client_socket,
-         buffer,
-         strlen(buffer),
-         0);
+        // File not found
+        if(strcmp(buffer, "error") == 0){
 
-    recv(client_socket,
-         buffer,
-         sizeof(buffer),
-         0);
+            printf("File not found\n");
 
-    printf("%s\n", buffer);
+            break;
+        }
 
-    // LIST command
-    strcpy(buffer,
-           "LIST\r\n");
+        // Transfer complete
+        if(strcmp(buffer, "completed") == 0){
 
-    send(client_socket,
-         buffer,
-         strlen(buffer),
-         0);
+            printf("File transferred successfully\n");
 
-    recv(client_socket,
-         buffer,
-         sizeof(buffer),
-         0);
+            break;
+        }
 
-    printf("%s\n", buffer);
+        // Display contents
+        printf("%s", buffer);
 
-    // QUIT command
-    strcpy(buffer,
-           "QUIT\r\n");
+        fprintf(fp, "%s", buffer);
+    }
 
-    send(client_socket,
-         buffer,
-         strlen(buffer),
-         0);
+    fclose(fp);
 
-    recv(client_socket,
-         buffer,
-         sizeof(buffer),
-         0);
-
-    printf("%s\n", buffer);
-
-    // Close socket
     close(client_socket);
 
     return 0;

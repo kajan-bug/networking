@@ -10,7 +10,10 @@ int main() {
     int server_socket,
         client_socket;
 
-    char buffer[1024];
+    char buffer[1024],
+         file_data[1024];
+
+    FILE *fp;
 
     struct sockaddr_in server_addr,
                        client_addr;
@@ -22,15 +25,21 @@ int main() {
                            SOCK_STREAM,
                            0);
 
+    if(server_socket < 0){
+
+        printf("Socket creation failed\n");
+
+        return 1;
+    }
+
     // Configure server
     server_addr.sin_family = AF_INET;
 
     server_addr.sin_port = htons(2121);
 
-    server_addr.sin_addr.s_addr =
-            INADDR_ANY;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
 
-    // Bind socket
+    // Bind
     bind(server_socket,
         (struct sockaddr*)&server_addr,
         sizeof(server_addr));
@@ -38,7 +47,7 @@ int main() {
     // Listen
     listen(server_socket, 5);
 
-    printf("FTP Server Waiting...\n");
+    printf("Server Waiting...\n");
 
     addr_size = sizeof(client_addr);
 
@@ -47,79 +56,49 @@ int main() {
                           (struct sockaddr*)&client_addr,
                           &addr_size);
 
-    // Welcome message
-    strcpy(buffer,
-           "220 FTP Server Ready\r\n");
-
-    send(client_socket,
+    // Receive filename
+    recv(client_socket,
          buffer,
-         strlen(buffer),
+         sizeof(buffer),
          0);
 
-    while(1){
+    printf("Requested File : %s\n", buffer);
 
-        memset(buffer, 0, sizeof(buffer));
+    // Open file
+    fp = fopen(buffer, "r");
 
-        recv(client_socket,
-             buffer,
-             sizeof(buffer),
-             0);
+    if(fp == NULL){
 
-        printf("Client : %s", buffer);
-
-        // USER command
-        if(strncmp(buffer,
-                  "USER",
-                  4) == 0){
-
-            strcpy(buffer,
-                   "331 Username OK Need Password\r\n");
-        }
-
-        // PASS command
-        else if(strncmp(buffer,
-                       "PASS",
-                       4) == 0){
-
-            strcpy(buffer,
-                   "230 Login Successful\r\n");
-        }
-
-        // LIST command
-        else if(strncmp(buffer,
-                       "LIST",
-                       4) == 0){
-
-            strcpy(buffer,
-                   "150 File List\nfile1.txt\nfile2.txt\n");
-        }
-
-        // QUIT command
-        else if(strncmp(buffer,
-                       "QUIT",
-                       4) == 0){
-
-            strcpy(buffer,
-                   "221 Connection Closed\r\n");
-
-            send(client_socket,
-                 buffer,
-                 strlen(buffer),
-                 0);
-
-            break;
-        }
-
-        else{
-
-            strcpy(buffer,
-                   "500 Invalid Command\r\n");
-        }
+        strcpy(buffer, "error");
 
         send(client_socket,
              buffer,
              strlen(buffer),
              0);
+    }
+
+    else{
+
+        while(fgets(file_data,
+                    sizeof(file_data),
+                    fp) != NULL){
+
+            send(client_socket,
+                 file_data,
+                 strlen(file_data),
+                 0);
+
+            sleep(1);
+        }
+
+        strcpy(buffer, "completed");
+
+        send(client_socket,
+             buffer,
+             strlen(buffer),
+             0);
+
+        fclose(fp);
     }
 
     close(client_socket);
